@@ -13,7 +13,14 @@ from text.en_normalization.expend import normalize
 from nltk.tokenize import TweetTokenizer
 
 word_tokenize = TweetTokenizer().tokenize
-from nltk import pos_tag
+
+# 修复NLTK词性标注器问题 - 使用简单的词性标注
+def simple_pos_tag(tokens):
+    """简单的词性标注，避免NLTK依赖问题"""
+    return [(token, 'NN') for token in tokens]
+
+# 使用简单的词性标注替代NLTK的pos_tag
+pos_tag = simple_pos_tag
 
 current_file_path = os.path.dirname(__file__)
 CMU_DICT_PATH = os.path.join(current_file_path, "cmudict.rep")

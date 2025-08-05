@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  gpt-sovits-api:
+    build: .
+    container_name: gpt-sovits-api
+    ports:
+      - "9880:9880"
+    volumes:
+      # 模型文件挂载
+      - ./models:/app/models
+      # 日志挂载
+      - ./logs:/app/logs
+      # 配置文件挂载
+      - ./configs:/app/configs
+    environment:
+      - PYTHONPATH=/app
+      - CUDA_VISIBLE_DEVICES=""
+      - DEVICE=cpu
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9880/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - gpt-sovits-network
+
+  # 可选：Redis缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: gpt-sovits-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - gpt-sovits-network
+
+  # 可选：Nginx反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: gpt-sovits-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - gpt-sovits-api
+    restart: unless-stopped
+    networks:
+      - gpt-sovits-network
+
+volumes:
+  redis_data:
+
+networks:
+  gpt-sovits-network:
+    driver: bridge 

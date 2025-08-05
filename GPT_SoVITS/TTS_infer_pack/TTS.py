@@ -217,8 +217,8 @@ def set_seed(seed: int):
 class TTS_Config:
     default_configs = {
         "v1": {
-            "device": "cpu",
-            "is_half": False,
+            "device": "cuda:0",
+            "is_half": True,
             "version": "v1",
             "t2s_weights_path": "GPT_SoVITS/pretrained_models/s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt",
             "vits_weights_path": "GPT_SoVITS/pretrained_models/s2G488k.pth",
@@ -226,8 +226,8 @@ class TTS_Config:
             "bert_base_path": "GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large",
         },
         "v2": {
-            "device": "cpu",
-            "is_half": False,
+            "device": "cuda:0",
+            "is_half": True,
             "version": "v2",
             "t2s_weights_path": "GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt",
             "vits_weights_path": "GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s2G2333k.pth",
@@ -235,8 +235,8 @@ class TTS_Config:
             "bert_base_path": "GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large",
         },
         "v3": {
-            "device": "cpu",
-            "is_half": False,
+            "device": "cuda:0",
+            "is_half": True,
             "version": "v3",
             "t2s_weights_path": "GPT_SoVITS/pretrained_models/s1v3.ckpt",
             "vits_weights_path": "GPT_SoVITS/pretrained_models/s2Gv3.pth",
@@ -244,8 +244,8 @@ class TTS_Config:
             "bert_base_path": "GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large",
         },
         "v4": {
-            "device": "cpu",
-            "is_half": False,
+            "device": "cuda:0",
+            "is_half": True,
             "version": "v4",
             "t2s_weights_path": "GPT_SoVITS/pretrained_models/s1v3.ckpt",
             "vits_weights_path": "GPT_SoVITS/pretrained_models/gsv-v4-pretrained/s2Gv4.pth",
@@ -253,8 +253,8 @@ class TTS_Config:
             "bert_base_path": "GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large",
         },
         "v2Pro": {
-            "device": "cpu",
-            "is_half": False,
+            "device": "cuda:0",
+            "is_half": True,
             "version": "v2Pro",
             "t2s_weights_path": "GPT_SoVITS/pretrained_models/s1v3.ckpt",
             "vits_weights_path": "GPT_SoVITS/pretrained_models/v2Pro/s2Gv2Pro.pth",
@@ -262,8 +262,8 @@ class TTS_Config:
             "bert_base_path": "GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large",
         },
         "v2ProPlus": {
-            "device": "cpu",
-            "is_half": False,
+            "device": "cuda:0",
+            "is_half": True,
             "version": "v2ProPlus",
             "t2s_weights_path": "GPT_SoVITS/pretrained_models/s1v3.ckpt",
             "vits_weights_path": "GPT_SoVITS/pretrained_models/v2Pro/s2Gv2ProPlus.pth",
@@ -741,6 +741,7 @@ class TTS:
         Args:
             ref_audio_path: str, the path of the reference audio.
         """
+        # 所有模型都需要设置prompt_semantic，因为T2S推理需要
         self._set_prompt_semantic(ref_audio_path)
         self._set_ref_spec(ref_audio_path)
         self._set_ref_audio_path(ref_audio_path)
@@ -810,12 +811,13 @@ class TTS:
                 zero_wav_torch = zero_wav_torch.half()
 
             wav16k = torch.cat([wav16k, zero_wav_torch])
-            hubert_feature = self.cnhuhbert_model.model(wav16k.unsqueeze(0))["last_hidden_state"].transpose(
-                1, 2
-            )  # .float()
+            
+            # 使用CNHubert提取特征
+            hubert_feature = self.cnhuhbert_model.model(wav16k.unsqueeze(0))["last_hidden_state"].transpose(1, 2)
             codes = self.vits_model.extract_latent(hubert_feature)
 
             prompt_semantic = codes[0, 0].to(self.configs.device)
+            print(f"Debug: prompt_semantic shape: {prompt_semantic.shape}, content: {prompt_semantic[:10].tolist()}")
             self.prompt_cache["prompt_semantic"] = prompt_semantic
 
     def batch_sequences(self, sequences: List[torch.Tensor], axis: int = 0, pad_value: int = 0, max_length: int = None):
@@ -1212,6 +1214,8 @@ class TTS:
                     )
 
                 print(f"############ {i18n('预测语义Token')} ############")
+                early_stop_num = self.configs.hz * self.configs.max_sec
+                print(f"Debug: hz={self.configs.hz}, max_sec={self.configs.max_sec}, early_stop_num={early_stop_num}")
                 pred_semantic_list, idx_list = self.t2s_model.model.infer_panel(
                     all_phoneme_ids,
                     all_phoneme_lens,
@@ -1221,12 +1225,18 @@ class TTS:
                     top_k=top_k,
                     top_p=top_p,
                     temperature=temperature,
-                    early_stop_num=self.configs.hz * self.configs.max_sec,
+                    early_stop_num=early_stop_num,
                     max_len=max_len,
                     repetition_penalty=repetition_penalty,
                 )
                 t4 = time.perf_counter()
                 t_34 += t4 - t3
+                
+                # 调试信息：查看生成的语义token数量
+                for i, (pred_semantic, idx) in enumerate(zip(pred_semantic_list, idx_list)):
+                    print(f"Debug: 第{i}个样本 - 生成token数量: {idx}, 总token数量: {pred_semantic.shape[0]}")
+                    if idx > 0:
+                        print(f"Debug: 新生成的token: {pred_semantic[-idx:].tolist()}")
 
                 refer_audio_spec = []
                 if self.is_v2pro:

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS API 调用示例</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+        .examples {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .example-btn {
+            background-color: #28a745;
+            font-size: 12px;
+            padding: 5px 10px;
+            margin: 2px;
+        }
+        .example-btn:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ TTS API 调用示例</h1>
+        <p style="text-align: center; color: #666;">
+            服务器: <strong>http://219.144.21.182:9880</strong> | 
+            支持多语言混合推理 (text_lang=auto)
+        </p>
+        
+        <form id="ttsForm">
+            <div class="form-group">
+                <label for="text">要合成的文本 (支持多语言混合):</label>
+                <textarea id="text" placeholder="输入要合成的文本，支持中英日韩等多语言混合...">你好world，这是一个test，包含中文和English mixed content。</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="voice">音色选择:</label>
+                <select id="voice">
+                    <option value="vivienne">vivienne (女声)</option>
+                    <option value="allen">allen (男声)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="textLang">文本语言:</label>
+                <select id="textLang">
+                    <option value="auto">auto (自动检测多语言)</option>
+                    <option value="zh">zh (中文)</option>
+                    <option value="en">en (英文)</option>
+                    <option value="ja">ja (日文)</option>
+                    <option value="ko">ko (韩文)</option>
+                </select>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;">
+                    <label for="temperature">温度 (0.1-2.0):</label>
+                    <input type="number" id="temperature" min="0.1" max="2.0" step="0.1" value="1.0">
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label for="speed">语速 (0.5-2.0):</label>
+                    <input type="number" id="speed" min="0.5" max="2.0" step="0.1" value="1.0">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <button type="submit" id="generateBtn">🎵 生成语音</button>
+                <button type="button" id="optimizeBtn">⚡ 检查优化状态</button>
+            </div>
+        </form>
+        
+        <!-- 示例文本 -->
+        <div class="examples">
+            <strong>📝 示例文本 (点击快速填入):</strong><br>
+            <button type="button" class="example-btn" onclick="setExample('你好world，这是一个test，包含中文和English mixed content。')">中英混合</button>
+            <button type="button" class="example-btn" onclick="setExample('这是一个纯中文的语音合成测试，效果很不错。')">纯中文</button>
+            <button type="button" class="example-btn" onclick="setExample('This is a pure English text-to-speech synthesis test.')">纯英文</button>
+            <button type="button" class="example-btn" onclick="setExample('你好，こんにちは，Hello world！多语言混合测试です。')">中日英混合</button>
+            <button type="button" class="example-btn" onclick="setExample('안녕하세요，你好，Hello！韩中英混合测试입니다。')">韩中英混合</button>
+        </div>
+        
+        <!-- 状态显示 -->
+        <div id="status"></div>
+        
+        <!-- 音频播放器 -->
+        <div id="audioContainer"></div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://219.144.21.182:9880';
+        
+        // 表单提交处理
+        document.getElementById('ttsForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await generateSpeech();
+        });
+        
+        // 检查优化状态
+        document.getElementById('optimizeBtn').addEventListener('click', async function() {
+            await checkOptimizationStatus();
+        });
+        
+        // 生成语音
+        async function generateSpeech() {
+            const generateBtn = document.getElementById('generateBtn');
+            const status = document.getElementById('status');
+            
+            // 获取表单数据
+            const text = document.getElementById('text').value.trim();
+            const voice = document.getElementById('voice').value;
+            const textLang = document.getElementById('textLang').value;
+            const temperature = parseFloat(document.getElementById('temperature').value);
+            const speed = parseFloat(document.getElementById('speed').value);
+            
+            if (!text) {
+                showStatus('请输入要合成的文本', 'error');
+                return;
+            }
+            
+            // 禁用按钮并显示进度
+            generateBtn.disabled = true;
+            generateBtn.textContent = '🔄 生成中...';
+            showStatus('正在生成语音，请稍候...', 'info');
+            
+            try {
+                const startTime = Date.now();
+                
+                // 构建请求数据
+                const payload = {
+                    text: text,
+                    text_lang: textLang,
+                    ref_audio_path: `voice/${voice}/sample.mp3`,
+                    prompt_text: getPromptText(voice),
+                    prompt_lang: voice === 'allen' ? 'zh' : 'en',
+                    temperature: temperature,
+                    speed_factor: speed,
+                    sample_steps: 32,
+                    top_k: 5,
+                    top_p: 1.0,
+                    text_split_method: 'cut5',
+                    batch_size: 1,
+                    media_type: 'wav',
+                    streaming_mode: false
+                };
+                
+                // 发送请求
+                const response = await fetch(`${BASE_URL}/tts`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const endTime = Date.now();
+                const duration = (endTime - startTime) / 1000;
+                
+                if (response.ok) {
+                    const audioBlob = await response.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // 显示音频播放器
+                    const audioContainer = document.getElementById('audioContainer');
+                    audioContainer.innerHTML = `
+                        <audio controls>
+                            <source src="${audioUrl}" type="audio/wav">
+                            您的浏览器不支持音频播放。
+                        </audio>
+                    `;
+                    
+                    showStatus(`✅ 语音生成成功！耗时: ${duration.toFixed(2)}秒，文件大小: ${(audioBlob.size/1024).toFixed(1)}KB`, 'success');
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    const errorMsg = errorData.message || `HTTP ${response.status}`;
+                    showStatus(`❌ 生成失败: ${errorMsg}`, 'error');
+                }
+                
+            } catch (error) {
+                showStatus(`❌ 请求失败: ${error.message}`, 'error');
+            } finally {
+                // 恢复按钮
+                generateBtn.disabled = false;
+                generateBtn.textContent = '🎵 生成语音';
+            }
+        }
+        
+        // 检查优化状态
+        async function checkOptimizationStatus() {
+            try {
+                const response = await fetch(`${BASE_URL}/optimization_status`);
+                if (response.ok) {
+                    const status = await response.json();
+                    let statusMsg = `🔍 优化状态检查:\n`;
+                    statusMsg += `CUDA可用: ${status.cuda_available ? '✅' : '❌'}\n`;
+                    statusMsg += `优化启用: ${status.optimization_enabled ? '✅' : '❌'}\n`;
+                    statusMsg += `优化初始化: ${status.optimization_initialized ? '✅' : '❌'}\n`;
+                    statusMsg += `配置: chunk_size=${status.config?.chunk_size}, overlap_ratio=${status.config?.overlap_ratio}`;
+                    
+                    if (status.optimization_details) {
+                        statusMsg += `\n详情: 缓存${status.optimization_details.cached_graph_shapes}个形状，预热${status.optimization_details.warmup_completed ? '完成' : '未完成'}`;
+                    }
+                    
+                    showStatus(statusMsg, 'info');
+                } else {
+                    showStatus('❌ 无法获取优化状态', 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ 检查优化状态失败: ${error.message}`, 'error');
+            }
+        }
+        
+        // 获取提示文本
+        function getPromptText(voice) {
+            const prompts = {
+                'vivienne': 'Hello, this is a sample text.',
+                'allen': '你好，这是一个示例文本。'
+            };
+            return prompts[voice] || 'Hello, this is a sample text.';
+        }
+        
+        // 设置示例文本
+        function setExample(text) {
+            document.getElementById('text').value = text;
+        }
+        
+        // 显示状态信息
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.className = `status ${type}`;
+            status.innerHTML = message.replace(/\n/g, '<br>');
+        }
+        
+        // 页面加载时检查服务器状态
+        window.addEventListener('load', async function() {
+            try {
+                const response = await fetch(`${BASE_URL}/performance_stats`);
+                if (response.ok) {
+                    showStatus('🟢 服务器连接正常', 'success');
+                } else {
+                    showStatus('🟡 服务器响应异常', 'error');
+                }
+            } catch (error) {
+                showStatus('🔴 无法连接到服务器，请检查服务器地址', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

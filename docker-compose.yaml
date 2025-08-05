@@ -1,4 +1,4 @@
-version: "3.8"
+# 移除过时的version字段
 
 services:
   GPT-SoVITS-CU126:
@@ -30,8 +30,6 @@ services:
       - "9880:9880"
     volumes:
       - .:/workspace/GPT-SoVITS
-      - tools/asr/models:/workspace/models/asr_models
-      - tools/uvr5/uvr5_weights:/workspace/models/uvr5_weights
     environment:
       - is_half=true
     tty: true
@@ -68,8 +66,6 @@ services:
       - "9880:9880"
     volumes:
       - .:/workspace/GPT-SoVITS
-      - tools/asr/models:/workspace/models/asr_models
-      - tools/uvr5/uvr5_weights:/workspace/models/uvr5_weights
     environment:
       - is_half=true
     tty: true

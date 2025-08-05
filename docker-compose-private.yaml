@@ -1,0 +1,21 @@
+services:
+  gpt-sovits-api:
+    image: 1.82.180.74:5000/gpt-sovits-api:latest
+    container_name: gpt-sovits-api
+    ports:
+      - "9880:9880"
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONPATH=/app
+      - CUDA_VISIBLE_DEVICES=""
+      - DEVICE=cpu
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9880/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s 

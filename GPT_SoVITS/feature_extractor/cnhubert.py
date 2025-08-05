@@ -24,9 +24,7 @@ class CNHubert(nn.Module):
         super().__init__()
         if base_path is None:
             base_path = cnhubert_base_path
-        if os.path.exists(base_path):
-            ...
-        else:
+        if not os.path.exists(base_path):
             raise FileNotFoundError(base_path)
         self.model = HubertModel.from_pretrained(base_path, local_files_only=True)
         self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(base_path, local_files_only=True)
@@ -100,7 +98,5 @@ if __name__ == "__main__":
     model = get_model()
     src_path = "/Users/Shared/原音频2.wav"
     wav_16k_tensor = utils.load_wav_to_torch_and_resample(src_path, 16000)
-    model = model
-    wav_16k_tensor = wav_16k_tensor
     feats = get_content(model, wav_16k_tensor)
     print(feats.shape)

@@ -113,7 +113,7 @@ import wave
 import signal
 import numpy as np
 import soundfile as sf
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, File, UploadFile
 from fastapi.responses import StreamingResponse, JSONResponse
 import uvicorn
 from io import BytesIO
@@ -160,7 +160,7 @@ class TTS_Request(BaseModel):
     text_split_method: str = "cut5"
     batch_size: int = 1
     batch_threshold: float = 0.75
-    split_bucket: bool = True
+    split_bucket: bool = False  # v4模型不支持bucket处理，默认设为False
     speed_factor: float = 1.0
     fragment_interval: float = 0.3
     seed: int = -1
@@ -394,7 +394,7 @@ async def tts_get_endpoint(
     text_split_method: str = "cut0",
     batch_size: int = 1,
     batch_threshold: float = 0.75,
-    split_bucket: bool = True,
+    split_bucket: bool = False,  # v4模型不支持bucket处理
     speed_factor: float = 1.0,
     fragment_interval: float = 0.3,
     seed: int = -1,
@@ -447,23 +447,23 @@ async def set_refer_aduio(refer_audio_path: str = None):
     return JSONResponse(status_code=200, content={"message": "success"})
 
 
-# @APP.post("/set_refer_audio")
-# async def set_refer_aduio_post(audio_file: UploadFile = File(...)):
-#     try:
-#         # 检查文件类型，确保是音频文件
-#         if not audio_file.content_type.startswith("audio/"):
-#             return JSONResponse(status_code=400, content={"message": "file type is not supported"})
+@APP.post("/set_refer_audio")
+async def set_refer_aduio_post(audio_file: UploadFile = File(...)):
+    try:
+        # 检查文件类型，确保是音频文件
+        if not audio_file.content_type.startswith("audio/"):
+            return JSONResponse(status_code=400, content={"message": "file type is not supported"})
 
-#         os.makedirs("uploaded_audio", exist_ok=True)
-#         save_path = os.path.join("uploaded_audio", audio_file.filename)
-#         # 保存音频文件到服务器上的一个目录
-#         with open(save_path , "wb") as buffer:
-#             buffer.write(await audio_file.read())
+        os.makedirs("uploaded_audio", exist_ok=True)
+        save_path = os.path.join("uploaded_audio", audio_file.filename)
+        # 保存音频文件到服务器上的一个目录
+        with open(save_path , "wb") as buffer:
+            buffer.write(await audio_file.read())
 
-#         tts_pipeline.set_ref_audio(save_path)
-#     except Exception as e:
-#         return JSONResponse(status_code=400, content={"message": f"set refer audio failed", "Exception": str(e)})
-#     return JSONResponse(status_code=200, content={"message": "success"})
+        tts_pipeline.set_ref_audio(save_path)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"message": f"set refer audio failed", "Exception": str(e)})
+    return JSONResponse(status_code=200, content={"message": "success"})
 
 
 @APP.get("/set_gpt_weights")
